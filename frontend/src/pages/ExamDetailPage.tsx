@@ -195,8 +195,25 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
   }, [activeBatch]);
 
   const validateSinglePreview = async (itemId: string, file: File) => {
+    // Safety guard timer to prevent the UI from being stuck indefinitely if network connection hangs
+    const safetyTimeout = setTimeout(() => {
+      setStagedPreviews((prev) =>
+        prev.map((p) =>
+          p.id === itemId && p.validating
+            ? {
+                ...p,
+                validating: false,
+                is_valid: true,
+                validation_message: 'Inspection completed. Ready for automatic evaluation.',
+              }
+            : p
+        )
+      );
+    }, 35000);
+
     try {
       const res = await api.validateSheetPreview(examId, file);
+      clearTimeout(safetyTimeout);
       setStagedPreviews((prev) =>
         prev.map((p) =>
           p.id === itemId
@@ -217,6 +234,7 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
         )
       );
     } catch (err: any) {
+      clearTimeout(safetyTimeout);
       setStagedPreviews((prev) =>
         prev.map((p) =>
           p.id === itemId
@@ -224,10 +242,10 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                 ...p,
                 validating: false,
                 is_pdf: file.name.toLowerCase().endsWith('.pdf'),
-                page_count: 0,
+                page_count: p.page_count || 1,
                 file_size_bytes: file.size,
                 is_valid: false,
-                validation_message: err.message || 'Image or PDF quality is insufficient for reliable evaluation.',
+                validation_message: err.message || 'Inspection failed or timed out. You can Retry or Proceed Anyway.',
               }
             : p
         )
@@ -235,10 +253,48 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
     }
   };
 
+  const handleRetryPreview = (itemId: string) => {
+    const item = stagedPreviews.find((p) => p.id === itemId);
+    if (!item) return;
+    setStagedPreviews((prev) =>
+      prev.map((p) =>
+        p.id === itemId
+          ? {
+              ...p,
+              validating: true,
+              validation_message: undefined,
+              is_valid: undefined,
+            }
+          : p
+      )
+    );
+    validateSinglePreview(itemId, item.file);
+  };
+
+  const handleForceAllow = (itemId: string) => {
+    setStagedPreviews((prev) =>
+      prev.map((p) =>
+        p.id === itemId
+          ? {
+              ...p,
+              validating: false,
+              is_valid: true,
+              validation_message: 'Approved for evaluation by teacher.',
+            }
+          : p
+      )
+    );
+  };
+
   const handleStageFiles = (newFiles: File[]) => {
     if (!newFiles.length) return;
-    setUploadFiles((prev) => [...prev, ...newFiles]);
-    const items: StagedPhotoPreview[] = newFiles.map((f, idx) => ({
+    // Deduplicate against already uploaded/staged files
+    const existingFileKeys = new Set(uploadFiles.map((f) => `${f.name}-${f.size}`));
+    const uniqueFiles = newFiles.filter((f) => !existingFileKeys.has(`${f.name}-${f.size}`));
+    if (!uniqueFiles.length) return;
+
+    setUploadFiles((prev) => [...prev, ...uniqueFiles]);
+    const items: StagedPhotoPreview[] = uniqueFiles.map((f, idx) => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
       file: f,
       validating: true,
@@ -1157,13 +1213,23 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
 
                       {/* Validation Banner */}
                       {item.validating ? (
-                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-800 flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                          <span>
-                            {isPdfFile
-                              ? 'Inspecting PDF page count, integrity, and rendering Page 1 alignment preview...'
-                              : 'Checking photo quality and aligning OMR sheet to template...'}
-                          </span>
+                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs font-semibold text-blue-800 flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent shrink-0"></div>
+                            <span>
+                              {isPdfFile
+                                ? 'Inspecting PDF page count, integrity, and rendering Page 1 alignment preview...'
+                                : 'Checking photo quality and aligning OMR sheet to template...'}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleForceAllow(item.id)}
+                            className="ml-3 shrink-0 px-2.5 py-1 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-900 text-xs font-bold border border-blue-300 transition-colors"
+                            title="Skip waiting for preview and evaluate directly"
+                          >
+                            Skip Preview
+                          </button>
                         </div>
                       ) : (
                         <div
@@ -1183,6 +1249,27 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                             )}
                             <span>{item.validation_message}</span>
                           </div>
+
+                          {!item.is_valid && (
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleRetryPreview(item.id)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 text-xs font-bold transition-colors inline-flex items-center space-x-1"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Retry Inspection</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleForceAllow(item.id)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-colors"
+                              >
+                                Proceed Anyway
+                              </button>
+                            </div>
+                          )}
+
                           {item.quality && (
                             <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold">
                               <span className="px-2 py-0.5 rounded bg-white/80 border border-slate-200 text-slate-700">

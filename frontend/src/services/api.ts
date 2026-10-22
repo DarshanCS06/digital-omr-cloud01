@@ -33,7 +33,7 @@ class ApiService {
     localStorage.removeItem('omr_user');
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, timeoutMs: number = 30000): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
       ...(options.headers as Record<string, string>),
@@ -47,27 +47,40 @@ class ApiService {
       headers['Content-Type'] = 'application/json';
     }
 
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (response.status === 401) {
-      this.clearToken();
-      window.location.href = '/login';
-      throw new Error('Session expired. Please log in again.');
+    try {
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      if (response.status === 401) {
+        this.clearToken();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please log in again.');
+      }
+
+      if (!response.ok) {
+        let errorMsg = `HTTP Error ${response.status}`;
+        try {
+          const errJson = await response.json();
+          errorMsg = errJson.detail || errorMsg;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+
+      return await response.json();
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Request timed out after ${Math.round(timeoutMs / 1000)} seconds. Please check your network connection or retry.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      let errorMsg = `HTTP Error ${response.status}`;
-      try {
-        const errJson = await response.json();
-        errorMsg = errJson.detail || errorMsg;
-      } catch {}
-      throw new Error(errorMsg);
-    }
-
-    return response.json();
   }
 
   // Auth
@@ -189,7 +202,7 @@ class ApiService {
     return this.request(`/batches/validate-preview/${examId}`, {
       method: 'POST',
       body: formData,
-    });
+    }, 45000);
   }
 
   async getBatchStatus(batchId: number): Promise<UploadBatch> {
