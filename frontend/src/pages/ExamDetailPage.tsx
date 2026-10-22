@@ -18,6 +18,7 @@ import {
   Eye,
   Check,
   X,
+  Edit2,
   FileText,
   Trash2,
 } from 'lucide-react';
@@ -78,19 +79,49 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
   const [rescoreReason, setRescoreReason] = useState('');
   const [rescoreSubmitting, setRescoreSubmitting] = useState(false);
 
-  // Inspection modal
+  // Inspection modal & student detail editing
   const [inspectedSub, setInspectedSub] = useState<Submission | null>(null);
   const [questionFilter, setQuestionFilter] = useState<'ALL' | 'WRONG' | 'CORRECT'>('ALL');
   const [previewSheetMode, setPreviewSheetMode] = useState<'blank' | 'filled'>('blank');
   const [evaluatingSample, setEvaluatingSample] = useState(false);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editRoll, setEditRoll] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
 
   const handleInspectSubmission = async (subId: number) => {
     try {
       const detail = await api.getSubmissionDetail(subId);
       setQuestionFilter('ALL');
+      setEditingDetails(false);
       setInspectedSub(detail);
     } catch (err) {
       console.error('Failed to load submission detail:', err);
+    }
+  };
+
+  const handleStartEditDetails = () => {
+    if (!inspectedSub) return;
+    setEditName(inspectedSub.student_name || '');
+    setEditRoll(inspectedSub.student_roll || inspectedSub.detected_roll_number || '');
+    setEditingDetails(true);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!inspectedSub) return;
+    setSavingDetails(true);
+    try {
+      const updated = await api.updateStudentDetails(inspectedSub.id, {
+        student_name: editName.trim() || undefined,
+        student_roll: editRoll.trim() || undefined,
+      });
+      setInspectedSub(updated);
+      setEditingDetails(false);
+      setSubmissions((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+    } catch (err: any) {
+      alert(`Failed to save student details: ${err.message}`);
+    } finally {
+      setSavingDetails(false);
     }
   };
 
@@ -894,7 +925,21 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                         </div>
                       </td>
                       <td className="py-3.5 px-4 font-medium text-slate-700">
-                        {sub.student_name || 'Unassigned'}
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-slate-800">{sub.student_name || 'Unassigned'}</span>
+                          {sub.name_confidence !== undefined && sub.name_confidence > 0 && (
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                sub.name_confidence >= 0.70
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
+                              }`}
+                              title={`Handwriting recognition confidence: ${Math.round(sub.name_confidence * 100)}%`}
+                            >
+                              HTR {Math.round(sub.name_confidence * 100)}%
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4 text-center font-bold text-slate-900">
                         {sub.total_score} <span className="text-slate-400 font-normal">/ {sub.max_score}</span>
@@ -1692,29 +1737,121 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
               </button>
             </div>
 
-            {/* Candidate Identity Bar (Read from OMR Sheet) */}
-            <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-indigo-600 text-white rounded-xl">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
-                    Student Name (Read from OMR Sheet)
+            {/* Candidate Identity Bar (Read from OMR Sheet) with HTR Recognition & Teacher Edit */}
+            <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 bg-indigo-600 text-white rounded-xl">
+                    <Users className="w-5 h-5" />
                   </div>
-                  <div className="text-base sm:text-lg font-extrabold text-slate-900">
-                    {inspectedSub.student_name || 'Candidate'}
+                  <div>
+                    <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-2">
+                      <span>Student Name (Read via HTR)</span>
+                      {inspectedSub.name_confidence !== undefined && inspectedSub.name_confidence > 0 && (
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            inspectedSub.name_confidence >= 0.70
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          {inspectedSub.name_confidence >= 0.70 ? '✓ Verified' : '⚠ Uncertain'} ({Math.round(inspectedSub.name_confidence * 100)}% Confidence)
+                        </span>
+                      )}
+                    </div>
+                    {editingDetails ? (
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Enter Student Name"
+                        className="mt-1 px-3 py-1.5 text-sm font-semibold border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                      />
+                    ) : (
+                      <div className="text-base sm:text-lg font-extrabold text-slate-900">
+                        {inspectedSub.student_name || 'Candidate'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-left sm:text-right">
+                    <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider flex items-center justify-end gap-1.5">
+                      <span>Roll Number</span>
+                      {inspectedSub.roll_confidence !== undefined && inspectedSub.roll_confidence > 0 && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                          {Math.round(inspectedSub.roll_confidence * 100)}%
+                        </span>
+                      )}
+                    </div>
+                    {editingDetails ? (
+                      <input
+                        type="text"
+                        value={editRoll}
+                        onChange={(e) => setEditRoll(e.target.value)}
+                        placeholder="Enter Roll No."
+                        className="mt-1 px-3 py-1.5 text-sm font-mono font-bold border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                      />
+                    ) : (
+                      <div className="text-base sm:text-lg font-mono font-extrabold text-indigo-900">
+                        {inspectedSub.student_roll || inspectedSub.detected_roll_number || 'N/A'}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    {editingDetails ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={savingDetails}
+                          onClick={handleSaveDetails}
+                          className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm"
+                        >
+                          {savingDetails ? 'Saving...' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingDetails(false)}
+                          className="px-2.5 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleStartEditDetails}
+                        className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-100 border border-indigo-300 rounded-lg shadow-sm flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit Details</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
-              <div className="text-left sm:text-right">
-                <div className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">
-                  Roll Number (Read from OMR Sheet)
+
+              {/* Cropped Handwriting Preview Banner if available */}
+              {inspectedSub.name_crop_url && (
+                <div className="pt-2 border-t border-indigo-100 flex flex-wrap items-center gap-3">
+                  <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Cropped Name Box:
+                  </span>
+                  <img
+                    src={inspectedSub.name_crop_url}
+                    alt="Cropped handwritten student name"
+                    className="h-10 rounded border border-indigo-200 bg-white shadow-sm object-contain px-1"
+                  />
+                  {inspectedSub.name_confidence !== undefined && inspectedSub.name_confidence < 0.70 && (
+                    <span className="text-xs text-amber-700 font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      Low confidence: please verify or edit the name above before finalizing.
+                    </span>
+                  )}
                 </div>
-                <div className="text-base sm:text-lg font-mono font-extrabold text-indigo-900">
-                  {inspectedSub.student_roll || inspectedSub.detected_roll_number || 'N/A'}
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Result & Correction KPI Banner */}

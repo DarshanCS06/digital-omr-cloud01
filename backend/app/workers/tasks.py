@@ -212,8 +212,16 @@ def process_single_image(image_id: int, db: Session):
             return
 
         # 7. Student Identification (Roll No. & Student Name from OMR Sheet or PDF text)
-        detected_roll = omr_res.get("detected_roll_number") or pdf_roll
-        detected_name = omr_res.get("detected_student_name") or pdf_name
+        detected_roll = pdf_roll or omr_res.get("detected_roll_number")
+        detected_name = pdf_name or omr_res.get("detected_student_name")
+        name_conf = 1.0 if pdf_name else float(omr_res.get("name_confidence", 0.0))
+        roll_conf = 1.0 if pdf_roll else float(omr_res.get("roll_confidence", 0.0))
+        name_crop_url = omr_res.get("name_crop_url")
+        details_need_review = (
+            False
+            if (pdf_roll and pdf_name)
+            else bool(omr_res.get("details_need_review", False))
+        )
         sheet_id = omr_res.get("sheet_identifier")
         student = None
         if detected_roll and "?" not in detected_roll:
@@ -267,15 +275,24 @@ def process_single_image(image_id: int, db: Session):
             db.delete(existing_sub)
             db.commit()
 
+        # Flag for human review if question marks are uncertain or candidate details are uncertain (<0.70 confidence)
+        uncertain_q = omr_res.get("uncertain_questions_count", 0)
+        needs_review = (uncertain_q > 0) or details_need_review
+        sub_status = SubmissionStatus.NEEDS_REVIEW if needs_review else SubmissionStatus.PROVISIONAL
+
         submission = Submission(
             examination_id=exam.id,
             student_id=student.id if student else None,
             uploaded_image_id=img_record.id,
             sheet_identifier=sheet_id,
             detected_roll_number=detected_roll,
+            detected_student_name=detected_name,
+            name_confidence=name_conf,
+            roll_confidence=roll_conf,
+            name_crop_url=name_crop_url,
             is_duplicate=is_dup,
             duplicate_of_id=dup_of_id,
-            status=SubmissionStatus.PROVISIONAL if omr_res["uncertain_questions_count"] == 0 else SubmissionStatus.NEEDS_REVIEW,
+            status=sub_status,
         )
         db.add(submission)
         db.commit()

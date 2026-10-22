@@ -243,6 +243,16 @@ class ApiService {
     });
   }
 
+  async updateStudentDetails(
+    submissionId: number,
+    data: { student_name?: string; student_roll?: string }
+  ): Promise<Submission> {
+    return this.request<Submission>(`/submissions/${submissionId}/student-details`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   getOriginalImageUrl(submissionId: number): string {
     const token = this.getToken();
     return `${API_BASE}/submissions/${submissionId}/images/original?token=${token}`;

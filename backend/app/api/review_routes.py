@@ -44,6 +44,7 @@ def get_review_queue(
             resp.student_name = sub.student.name
             resp.student_roll = sub.student.roll_number
         else:
+            resp.student_name = sub.detected_student_name
             resp.student_roll = sub.detected_roll_number
         results.append(resp)
 

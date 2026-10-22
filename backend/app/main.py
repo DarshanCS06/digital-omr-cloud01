@@ -24,6 +24,25 @@ logger = logging.getLogger("digital_omr")
 def bootstrap_database():
     """Initializes tables and bootstraps initial admin user and template configurations."""
     Base.metadata.create_all(bind=engine)
+
+    # Lightweight schema migration for newly added HTR columns
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "submissions" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("submissions")]
+            with engine.begin() as conn:
+                if "detected_student_name" not in columns:
+                    conn.execute(text("ALTER TABLE submissions ADD COLUMN detected_student_name VARCHAR(200)"))
+                if "name_confidence" not in columns:
+                    conn.execute(text("ALTER TABLE submissions ADD COLUMN name_confidence FLOAT DEFAULT 0.0"))
+                if "roll_confidence" not in columns:
+                    conn.execute(text("ALTER TABLE submissions ADD COLUMN roll_confidence FLOAT DEFAULT 0.0"))
+                if "name_crop_url" not in columns:
+                    conn.execute(text("ALTER TABLE submissions ADD COLUMN name_crop_url TEXT"))
+    except Exception as em:
+        logger.warning(f"Schema migration note: {em}")
+
     db: Session = SessionLocal()
     try:
         # 1. Seed Initial Administrator

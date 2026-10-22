@@ -15,6 +15,8 @@ import {
   Layers,
   FileCheck2,
   Camera,
+  Edit2,
+  Users,
 } from 'lucide-react';
 
 /** Fetches a private authenticated image endpoint and returns an object URL. */
@@ -97,6 +99,10 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
 
   // View mode switcher: diagnostic overlay | rectified sheet | original photo
   const [viewMode, setViewMode] = useState<'diagnostic' | 'rectified' | 'original'>('diagnostic');
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editRoll, setEditRoll] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
 
   // Build authenticated image URL based on selected view mode
   const currentImageUrl = currentDetail?.id
@@ -146,6 +152,31 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
       }
     } catch (err) {
       console.error('Failed to load detail:', err);
+    }
+  };
+
+  const handleStartEditDetails = () => {
+    if (!currentDetail) return;
+    setEditName(currentDetail.student_name || '');
+    setEditRoll(currentDetail.student_roll || currentDetail.detected_roll_number || '');
+    setEditingDetails(true);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!currentDetail) return;
+    setSavingDetails(true);
+    try {
+      const updated = await api.updateStudentDetails(currentDetail.id, {
+        student_name: editName.trim() || undefined,
+        student_roll: editRoll.trim() || undefined,
+      });
+      setCurrentDetail(updated);
+      setEditingDetails(false);
+      setQueue((prev) => prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)));
+    } catch (err: any) {
+      alert(`Failed to save student details: ${err.message}`);
+    } finally {
+      setSavingDetails(false);
     }
   };
 
@@ -265,6 +296,120 @@ export const ReviewQueuePage: React.FC<ReviewQueuePageProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Candidate Details & HTR Verification Card */}
+      {currentDetail && (
+        <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-200">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <span>Student Name (HTR)</span>
+                {currentDetail.name_confidence !== undefined && currentDetail.name_confidence > 0 && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                      currentDetail.name_confidence >= 0.70
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200'
+                    }`}
+                  >
+                    HTR {Math.round(currentDetail.name_confidence * 100)}%
+                  </span>
+                )}
+              </div>
+              {editingDetails ? (
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter Student Name"
+                  className="mt-1 px-2.5 py-1 text-sm font-semibold border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                />
+              ) : (
+                <div className="text-base font-bold text-slate-900">
+                  {currentDetail.student_name || 'Unassigned'}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div>
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-end gap-1.5">
+                <span>Roll Number</span>
+                {currentDetail.roll_confidence !== undefined && currentDetail.roll_confidence > 0 && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {Math.round(currentDetail.roll_confidence * 100)}%
+                  </span>
+                )}
+              </div>
+              {editingDetails ? (
+                <input
+                  type="text"
+                  value={editRoll}
+                  onChange={(e) => setEditRoll(e.target.value)}
+                  placeholder="Enter Roll No."
+                  className="mt-1 px-2.5 py-1 text-sm font-mono font-bold border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-white"
+                />
+              ) : (
+                <div className="text-base font-mono font-bold text-indigo-900">
+                  {currentDetail.student_roll || currentDetail.detected_roll_number || 'UNASSIGNED'}
+                </div>
+              )}
+            </div>
+
+            <div>
+              {editingDetails ? (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={savingDetails}
+                    onClick={handleSaveDetails}
+                    className="px-3 py-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm"
+                  >
+                    {savingDetails ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDetails(false)}
+                    className="px-2.5 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleStartEditDetails}
+                  className="px-3 py-1.5 text-xs font-bold text-indigo-700 bg-white hover:bg-indigo-50 border border-indigo-200 rounded-lg shadow-sm flex items-center gap-1"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit Name/Roll</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {currentDetail.name_crop_url && (
+            <div className="w-full pt-2 border-t border-slate-100 flex flex-wrap items-center gap-3">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Crop Preview:</span>
+              <img
+                src={currentDetail.name_crop_url}
+                alt="Cropped name"
+                className="h-8 rounded border border-slate-200 bg-white object-contain px-1"
+              />
+              {currentDetail.name_confidence !== undefined && currentDetail.name_confidence < 0.70 && (
+                <span className="text-xs text-amber-700 font-medium flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                  Please verify or correct student name before finalizing.
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Review Workspace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

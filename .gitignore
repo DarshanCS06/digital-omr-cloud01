@@ -44,7 +44,7 @@ storage/
 uploads/
 backups/
 .mobile_tunnel_url.txt
-generated/*.pdf
+generated/
 sample_data/*.jpg
 sample_data/*.png
 *.db

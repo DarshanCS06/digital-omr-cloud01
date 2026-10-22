@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
 from backend.app.models.user import User
+from backend.app.models.student import Student
+from backend.app.models.examination import Examination
 from backend.app.models.submission import (
     Submission,
     SubmissionStatus,
@@ -15,6 +17,7 @@ from backend.app.schemas.submission import (
     SubmissionResponse,
     SubmissionDetailResponse,
     DetectedResponseSchema,
+    UpdateStudentDetailsRequest,
 )
 from backend.app.auth.dependencies import require_teacher_or_admin, check_exam_access
 from backend.app.auth.security import decode_access_token
@@ -99,6 +102,7 @@ def list_submissions(
             resp.student_name = sub.student.name
             resp.student_roll = sub.student.roll_number
         else:
+            resp.student_name = sub.detected_student_name
             resp.student_roll = sub.detected_roll_number
         results.append(resp)
 
@@ -132,6 +136,7 @@ def get_submission_detail(
         resp.student_name = sub.student.name
         resp.student_roll = sub.student.roll_number
     else:
+        resp.student_name = sub.detected_student_name
         resp.student_roll = sub.detected_roll_number
 
     responses_list = []
@@ -322,3 +327,79 @@ def delete_single_submission(
         db.query(UploadedImage).filter(UploadedImage.id == img_id).delete(synchronize_session=False)
     db.commit()
     return {"message": f"Submission #{submission_id} deleted"}
+
+
+@router.post("/{submission_id}/student-details", response_model=SubmissionDetailResponse)
+def update_student_details(
+    submission_id: int,
+    req: UpdateStudentDetailsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_teacher_or_admin),
+):
+    """
+    Allows teachers or administrators to manually correct or verify student name and roll number.
+    Ensures zero guessing: updates student record, refreshes submission details, and clears
+    details-based review flag if all question responses are valid.
+    """
+    sub = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    check_exam_access(sub.examination_id, current_user, db)
+
+    exam = db.query(Examination).filter(Examination.id == sub.examination_id).first()
+
+    clean_name = req.student_name.strip() if req.student_name else None
+    clean_roll = req.student_roll.strip() if req.student_roll else None
+
+    if clean_roll:
+        sub.detected_roll_number = clean_roll
+        sub.roll_confidence = 1.0
+
+    if clean_name:
+        sub.detected_student_name = clean_name
+        sub.name_confidence = 1.0
+
+    # Link or update student record
+    if clean_roll:
+        student = db.query(Student).filter(Student.roll_number == clean_roll).first()
+        if not student:
+            student = Student(
+                roll_number=clean_roll,
+                name=clean_name or (sub.student.name if sub.student else "Candidate"),
+                class_grade=exam.class_grade if exam else None,
+            )
+            db.add(student)
+            db.flush()
+        else:
+            if clean_name:
+                student.name = clean_name
+        sub.student_id = student.id
+    elif clean_name and sub.student:
+        sub.student.name = clean_name
+
+    # If submission was in NEEDS_REVIEW solely because of unassigned/uncertain name/roll,
+    # and has zero uncertain question responses, transition to PROVISIONAL
+    if sub.status == SubmissionStatus.NEEDS_REVIEW and sub.review_count == 0:
+        if sub.detected_roll_number and "?" not in sub.detected_roll_number:
+            sub.status = SubmissionStatus.PROVISIONAL
+
+    # Check duplicate status
+    if sub.detected_roll_number:
+        dup = (
+            db.query(Submission)
+            .filter(
+                Submission.examination_id == sub.examination_id,
+                Submission.detected_roll_number == sub.detected_roll_number,
+                Submission.id != sub.id,
+            )
+            .first()
+        )
+        sub.is_duplicate = dup is not None
+        sub.duplicate_of_id = dup.id if dup else None
+
+    db.commit()
+    db.refresh(sub)
+
+    return get_submission_detail(submission_id=sub.id, db=db, current_user=current_user)
+

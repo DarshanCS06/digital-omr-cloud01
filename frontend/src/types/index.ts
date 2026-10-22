@@ -102,6 +102,10 @@ export interface Submission {
   student_name?: string;
   student_roll?: string;
   detected_roll_number?: string;
+  detected_student_name?: string;
+  name_confidence?: number;
+  roll_confidence?: number;
+  name_crop_url?: string;
   sheet_identifier?: string;
   status: SubmissionStatus;
   total_score: number;

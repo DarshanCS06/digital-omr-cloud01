@@ -34,6 +34,11 @@ class FinalizeSubmissionRequest(BaseModel):
     confirm_all: bool = True
 
 
+class UpdateStudentDetailsRequest(BaseModel):
+    student_name: Optional[str] = None
+    student_roll: Optional[str] = None
+
+
 class SubmissionResponse(BaseModel):
     id: int
     examination_id: int
@@ -41,6 +46,10 @@ class SubmissionResponse(BaseModel):
     student_name: Optional[str] = None
     student_roll: Optional[str] = None
     detected_roll_number: Optional[str] = None
+    detected_student_name: Optional[str] = None
+    name_confidence: float = 0.0
+    roll_confidence: float = 0.0
+    name_crop_url: Optional[str] = None
     sheet_identifier: Optional[str] = None
     status: SubmissionStatus
     total_score: float

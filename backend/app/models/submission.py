@@ -30,7 +30,11 @@ class Submission(Base):
     uploaded_image_id = Column(Integer, ForeignKey("uploaded_images.id", ondelete="CASCADE"), unique=True, nullable=False)
     
     sheet_identifier = Column(String(100), index=True, nullable=True)  # Read from QR or barcode
-    detected_roll_number = Column(String(50), index=True, nullable=True)  # Read from roll bubbles
+    detected_roll_number = Column(String(50), index=True, nullable=True)  # Read from roll bubbles or HTR
+    detected_student_name = Column(String(200), nullable=True)  # Read via HTR
+    name_confidence = Column(Float, default=0.0, nullable=False)
+    roll_confidence = Column(Float, default=0.0, nullable=False)
+    name_crop_url = Column(Text, nullable=True)  # Base64 thumbnail of cropped name field
     
     status = Column(Enum(SubmissionStatus), default=SubmissionStatus.PROVISIONAL, nullable=False)
     
