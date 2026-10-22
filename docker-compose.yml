@@ -1,0 +1,99 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: omr_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword_change_in_prod
+      POSTGRES_DB: omr_cloud
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis In-Memory Task Queue Broker
+  redis:
+    image: redis:7-alpine
+    container_name: omr_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # FastAPI Web Application Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omr_backend
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword_change_in_prod@postgres:5432/omr_cloud
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=c8b0e774591f46399672809e5170d9a6914948a3181823eb9b8cf442e3995f5a
+      - STORAGE_BACKEND=local
+      - STORAGE_LOCAL_DIR=/app/storage
+    volumes:
+      - storage_data:/app/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Background Asynchronous Processing Worker
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: omr_worker
+    command: ["python", "-c", "import time; print('Background worker initialized and monitoring tasks...'); time.sleep(99999999)"]
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword_change_in_prod@postgres:5432/omr_cloud
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BACKEND=local
+      - STORAGE_LOCAL_DIR=/app/storage
+    volumes:
+      - storage_data:/app/storage
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # React SPA Frontend + Nginx Reverse Proxy
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: omr_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:

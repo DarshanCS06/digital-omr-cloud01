@@ -1,0 +1,22 @@
+{
+  "name": "Vidyakashi OMR Portal",
+  "short_name": "Vidyakashi OMR",
+  "description": "Mobile OMR Sheet Scanner, Automatic Alignment, and Instant Result Evaluation",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/vidyakashi_official_omr.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/vidyakashi_official_omr.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

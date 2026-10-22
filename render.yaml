@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: vidyakashi-digital-omr
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: singapore
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: STORAGE_BACKEND
+        value: local
+      - key: STORAGE_LOCAL_DIR
+        value: /var/data/storage
+      - key: DATABASE_URL
+        value: sqlite:////var/data/omr.db
+    disk:
+      name: omr-storage
+      mountPath: /var/data
+      sizeGB: 1
