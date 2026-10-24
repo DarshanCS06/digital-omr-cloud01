@@ -60,9 +60,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <img
-            src="/vidyakashi_logo.jpg"
+            src="/vidyakashi_logo.jpg?v=2"
             alt="Vidyakashi Study Circle Logo"
-            className="w-24 h-24 rounded-2xl shadow-xl shadow-blue-500/20 object-contain border border-slate-200 bg-white p-1"
+            className="w-28 h-28 rounded-2xl shadow-xl shadow-blue-500/10 object-contain border border-slate-200/90 bg-white p-1.5 transition-transform hover:scale-105"
           />
         </div>
         <h2 className="mt-4 text-center text-3xl font-extrabold text-slate-900 tracking-tight">

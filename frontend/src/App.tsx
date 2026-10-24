@@ -71,8 +71,26 @@ export const App: React.FC = () => {
 
   if (initializing) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-600 border-t-transparent"></div>
+      <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-blue-50/30 flex flex-col items-center justify-center p-4">
+        <div className="relative flex flex-col items-center">
+          <div className="w-24 h-24 rounded-2xl bg-white border border-slate-200 shadow-xl shadow-blue-500/10 p-2 flex items-center justify-center mb-4">
+            <img
+              src="/vidyakashi_logo.jpg?v=2"
+              alt="Vidyakashi Study Circle"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900">
+            Vidyakashi <span className="text-blue-600">Study Circle</span>
+          </h1>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Digital OMR Cloud
+          </p>
+          <div className="mt-6 flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
+            <span className="text-xs font-medium text-slate-600">Loading system...</span>
+          </div>
+        </div>
       </div>
     );
   }

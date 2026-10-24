@@ -45,9 +45,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, activeTab, setActiveTab, o
             {/* Logo & Brand */}
             <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
               <img
-                src="/vidyakashi_logo.jpg"
+                src="/vidyakashi_logo.jpg?v=2"
                 alt="Vidyakashi Study Circle Logo"
-                className="w-10 h-10 rounded-xl object-contain shadow-sm border border-slate-100 bg-white"
+                className="w-10 h-10 rounded-xl object-contain shadow-sm border border-slate-100 bg-white p-0.5"
               />
               <div>
                 <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
