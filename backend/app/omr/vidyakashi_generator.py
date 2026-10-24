@@ -141,7 +141,7 @@ class VidyakashiOMRGenerator:
                 q_int = int(q_num)
                 if q_int not in self.layout.bubbles:
                     continue
-                opt_str = str(opt_val).upper().strip()
+                opt_str = (opt_val.value if hasattr(opt_val, "value") else str(opt_val)).split(".")[-1].upper().strip()
                 if opt_str not in self.layout.bubbles[q_int]:
                     continue
 

@@ -1891,14 +1891,14 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                 <span className="text-xs font-bold text-slate-700 block mb-1.5">1. Original Uploaded Sheet</span>
                 <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-slate-200 overflow-hidden">
                   <img
-                    src={`${api.getOriginalImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
+                    src={`${api.getOriginalImageUrl(inspectedSub.id)}&v=2&t=${Date.now()}`}
                     alt="Original"
                     loading="lazy"
                     className="max-h-96 mx-auto object-contain transition-opacity duration-300"
                     onError={(e) => {
                       const target = e.currentTarget;
                       if (!target.src.includes('retry=1')) {
-                        target.src = `${api.getOriginalImageUrl(inspectedSub.id)}&retry=1`;
+                        target.src = `${api.getOriginalImageUrl(inspectedSub.id)}&v=2&retry=1`;
                       }
                     }}
                   />
@@ -1908,14 +1908,14 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                 <span className="text-xs font-bold text-slate-700 block mb-1.5">2. Rectified Grid Alignment</span>
                 <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-slate-200 overflow-hidden">
                   <img
-                    src={`${api.getRectifiedImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
+                    src={`${api.getRectifiedImageUrl(inspectedSub.id)}&v=2&t=${Date.now()}`}
                     alt="Rectified"
                     loading="lazy"
                     className="max-h-96 mx-auto object-contain transition-opacity duration-300"
                     onError={(e) => {
                       const target = e.currentTarget;
                       if (!target.src.includes('retry=1')) {
-                        target.src = `${api.getRectifiedImageUrl(inspectedSub.id)}&retry=1`;
+                        target.src = `${api.getRectifiedImageUrl(inspectedSub.id)}&v=2&retry=1`;
                       }
                     }}
                   />
@@ -1927,14 +1927,14 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
                 </span>
                 <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-emerald-300 overflow-hidden">
                   <img
-                    src={`${api.getDiagnosticImageUrl(inspectedSub.id)}&t=${Date.now()}`}
+                    src={`${api.getDiagnosticImageUrl(inspectedSub.id)}&v=2&t=${Date.now()}`}
                     alt="Corrected OMR Overlay"
                     loading="lazy"
                     className="max-h-96 mx-auto object-contain transition-opacity duration-300"
                     onError={(e) => {
                       const target = e.currentTarget;
                       if (!target.src.includes('retry=1')) {
-                        target.src = `${api.getDiagnosticImageUrl(inspectedSub.id)}&retry=1`;
+                        target.src = `${api.getDiagnosticImageUrl(inspectedSub.id)}&v=2&retry=1`;
                       }
                     }}
                   />
