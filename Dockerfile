@@ -61,4 +61,4 @@ USER omruser
 EXPOSE 8000
 
 # Start server dynamically listening on cloud-assigned $PORT (Render/Railway/Fly/CloudRun)
-CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 2"]
+CMD ["sh", "-c", "exec uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1"]

@@ -23,7 +23,10 @@ logger = logging.getLogger("digital_omr")
 
 def bootstrap_database():
     """Initializes tables and bootstraps initial admin user and template configurations."""
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        logger.warning(f"Database table creation note: {e}")
 
     # Lightweight schema migration for newly added HTR columns
     try:
