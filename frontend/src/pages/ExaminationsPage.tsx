@@ -33,6 +33,12 @@ export const ExaminationsPage: React.FC<ExaminationsPageProps> = ({
   setIsCreateOpen,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Always refresh examinations list from database on mount
+  React.useEffect(() => {
+    onRefresh();
+  }, []);
   
   // Create form state
   const [code, setCode] = useState('');
@@ -94,6 +100,8 @@ export const ExaminationsPage: React.FC<ExaminationsPageProps> = ({
       setIsCreateOpen(false);
       resetForm();
       onRefresh();
+      setSuccessMessage('Examination created and saved permanently to database.');
+      setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err: any) {
       setFormError(err.message || 'Failed to create examination');
     } finally {
@@ -132,6 +140,14 @@ export const ExaminationsPage: React.FC<ExaminationsPageProps> = ({
           <span>New Examination</span>
         </button>
       </div>
+
+      {/* Success Alert Banner */}
+      {successMessage && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2 shadow-sm animate-fade-in">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{successMessage}</span>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative max-w-md">

@@ -106,7 +106,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={(tab) => {
           setActiveTab(tab);
-          if (tab === 'examinations') loadExaminations();
+          loadExaminations();
         }}
         onLogout={handleLogout}
       />
@@ -119,8 +119,12 @@ export const App: React.FC = () => {
             onOpenCreateExam={() => {
               setActiveTab('examinations');
               setIsCreateExamOpen(true);
+              loadExaminations();
             }}
-            onNavigateExamsList={() => setActiveTab('examinations')}
+            onNavigateExamsList={() => {
+              setActiveTab('examinations');
+              loadExaminations();
+            }}
           />
         )}
 
