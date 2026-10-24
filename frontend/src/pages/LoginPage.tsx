@@ -59,15 +59,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/30">
-            <FileCheck2 className="w-10 h-10" />
-          </div>
+          <img
+            src="/vidyakashi_logo.jpg"
+            alt="Vidyakashi Study Circle Logo"
+            className="w-24 h-24 rounded-2xl shadow-xl shadow-blue-500/20 object-contain border border-slate-200 bg-white p-1"
+          />
         </div>
         <h2 className="mt-4 text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-          Digital OMR Cloud
+          Vidyakashi Study Circle
         </h2>
-        <p className="mt-1 text-center text-sm text-slate-600">
-          Multi-Teacher Online OMR Answer Sheet Evaluation System
+        <p className="mt-1 text-center text-sm font-semibold text-blue-700">
+          Digital OMR Cloud • Multi-Teacher Evaluation System
         </p>
       </div>
 

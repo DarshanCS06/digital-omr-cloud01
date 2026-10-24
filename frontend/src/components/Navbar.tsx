@@ -44,15 +44,17 @@ export const Navbar: React.FC<NavbarProps> = ({ user, activeTab, setActiveTab, o
           <div className="flex items-center justify-between h-16">
             {/* Logo & Brand */}
             <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-              <div className="p-2 bg-blue-600 text-white rounded-lg shadow-sm">
-                <FileCheck2 className="w-6 h-6" />
-              </div>
+              <img
+                src="/vidyakashi_logo.jpg"
+                alt="Vidyakashi Study Circle Logo"
+                className="w-10 h-10 rounded-xl object-contain shadow-sm border border-slate-100 bg-white"
+              />
               <div>
                 <span className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-                  Vidyakashi <span className="text-blue-600">OMR</span> Portal
+                  Vidyakashi <span className="text-blue-600">Study Circle</span>
                 </span>
-                <span className="hidden lg:inline-block ml-2 text-xs bg-blue-50 text-blue-700 font-medium px-2 py-0.5 rounded-full border border-blue-200">
-                  Study Circle Evaluation
+                <span className="hidden lg:inline-block ml-2 text-xs bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded-full border border-blue-200">
+                  Digital OMR Cloud
                 </span>
               </div>
             </div>
