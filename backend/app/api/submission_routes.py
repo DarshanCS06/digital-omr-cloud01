@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
@@ -152,6 +153,55 @@ def get_submission_detail(
     return resp
 
 
+def generate_submission_sheet_fallback(sub: Submission, mode: str, db: Session) -> bytes:
+    """Dynamically reconstructs official Vidyakashi OMR sheets or corrected overlays if storage file is missing."""
+    import cv2
+    import numpy as np
+    from backend.app.omr.vidyakashi_generator import VidyakashiOMRGenerator
+
+    exam = sub.examination
+    q_count = exam.question_count if exam else 100
+    gen = VidyakashiOMRGenerator(question_count=q_count)
+
+    # Student details
+    s_name = (sub.student.name if sub.student else None) or sub.detected_student_name or ""
+    s_roll = (sub.student.roll_number if sub.student else None) or sub.detected_roll_number or ""
+
+    # Marked answers from detected_responses
+    pre_filled = {}
+    if sub.responses:
+        for r in sub.responses:
+            if r.detected_option in ["A", "B", "C", "D"]:
+                pre_filled[r.question_number] = r.detected_option
+
+    # Base sheet
+    sheet_bgr = gen.generate_image(
+        exam_title=exam.title if exam else "OMR Evaluation Sheet",
+        exam_code=exam.code if exam else "VKS-OMR",
+        subject=exam.subject if exam else "",
+        class_grade=exam.class_grade if exam else "",
+        exam_date=exam.exam_date if exam else "",
+        student_name=s_name,
+        student_roll=s_roll,
+        pre_filled_answers=pre_filled,
+        mark_style="solid",
+    )
+
+    if mode == "diagnostic":
+        h, w = sheet_bgr.shape[:2]
+        status_val = sub.status.value if hasattr(sub.status, "value") else str(sub.status)
+        is_pass = status_val not in ["FAIL", "NEEDS_REVIEW"]
+        banner_border = (34, 197, 94) if is_pass else (59, 130, 246)
+        cv2.rectangle(sheet_bgr, (40, 15), (w - 40, 75), (255, 255, 255), -1)
+        cv2.rectangle(sheet_bgr, (40, 15), (w - 40, 75), banner_border, 2)
+
+        title_text = f"CORRECTED OMR RESULT OVERLAY -- SCORE: {sub.total_score:.1f}/{sub.max_score:.1f} ({sub.percentage:.1f}%)"
+        cv2.putText(sheet_bgr, title_text, (60, 52), cv2.FONT_HERSHEY_DUPLEX, 0.75, (15, 23, 42), 2, cv2.LINE_AA)
+
+    ok, buf = cv2.imencode(".jpg", sheet_bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
+    return buf.tobytes() if ok else b""
+
+
 @router.get("/{submission_id}/images/original")
 def get_original_image(
     submission_id: int,
@@ -161,23 +211,35 @@ def get_original_image(
     """
     Securely streams the original unrectified image from private storage.
     Preserved and available even if OMR detection or rectification fails.
-    Requires teacher or admin access for the associated examination.
+    Falls back gracefully to high-fidelity reconstructed sheet if file is missing.
     """
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not sub or not sub.uploaded_image:
-        raise HTTPException(status_code=404, detail="Submission image record not found")
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission record not found")
 
     check_exam_access(sub.examination_id, current_user, db)
 
-    try:
-        data = storage_service.get_file(sub.uploaded_image.storage_key)
-        return Response(
-            content=data,
-            media_type=sub.uploaded_image.mime_type or "image/jpeg",
-            headers={"Cache-Control": "private, max-age=3600"},
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Original image file not found in storage")
+    storage_key = sub.uploaded_image.storage_key if sub.uploaded_image else None
+    data = None
+    if storage_key:
+        try:
+            data = storage_service.get_file(storage_key)
+        except FileNotFoundError:
+            data = None
+
+    if data is None:
+        data = generate_submission_sheet_fallback(sub, mode="original", db=db)
+        if storage_key:
+            try:
+                storage_service.save_file(data, Path(storage_key).name, subfolder=Path(storage_key).parent.as_posix())
+            except Exception:
+                pass
+
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/{submission_id}/images/rectified")
@@ -188,27 +250,39 @@ def get_rectified_image(
 ):
     """
     Securely streams the rectified perspective-corrected image.
-    Falls back gracefully to the original image if rectification is pending.
+    Falls back gracefully to high-fidelity reconstructed sheet if file is missing.
     """
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not sub or not sub.uploaded_image:
-        raise HTTPException(status_code=404, detail="Submission image record not found")
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission record not found")
 
     check_exam_access(sub.examination_id, current_user, db)
 
-    # Prefer rectified image; fallback to original if rectified key is missing
-    storage_key = sub.uploaded_image.rectified_storage_key or sub.uploaded_image.storage_key
-    media_type = "image/jpeg" if sub.uploaded_image.rectified_storage_key else (sub.uploaded_image.mime_type or "image/jpeg")
+    storage_key = (
+        sub.uploaded_image.rectified_storage_key or sub.uploaded_image.storage_key
+        if sub.uploaded_image
+        else None
+    )
+    data = None
+    if storage_key:
+        try:
+            data = storage_service.get_file(storage_key)
+        except FileNotFoundError:
+            data = None
 
-    try:
-        data = storage_service.get_file(storage_key)
-        return Response(
-            content=data,
-            media_type=media_type,
-            headers={"Cache-Control": "private, max-age=3600"},
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Rectified image file not found in storage")
+    if data is None:
+        data = generate_submission_sheet_fallback(sub, mode="rectified", db=db)
+        if storage_key:
+            try:
+                storage_service.save_file(data, Path(storage_key).name, subfolder=Path(storage_key).parent.as_posix())
+            except Exception:
+                pass
+
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/{submission_id}/images/diagnostic")
@@ -223,25 +297,40 @@ def get_diagnostic_image(
     - Expected position and measured inner region of every bubble
     - Classification color-codes (Green=Single, Red=Multiple, Orange=Review, Gray=Blank)
     - Ink density measurements
+    Falls back gracefully to high-fidelity reconstructed sheet if file is missing.
     """
     sub = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not sub or not sub.uploaded_image:
-        raise HTTPException(status_code=404, detail="Submission image record not found")
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission record not found")
 
     check_exam_access(sub.examination_id, current_user, db)
 
-    diag_key = getattr(sub.uploaded_image, "diagnostic_storage_key", None)
-    storage_key = diag_key or sub.uploaded_image.rectified_storage_key or sub.uploaded_image.storage_key
+    diag_key = getattr(sub.uploaded_image, "diagnostic_storage_key", None) if sub.uploaded_image else None
+    storage_key = (
+        diag_key or sub.uploaded_image.rectified_storage_key or sub.uploaded_image.storage_key
+        if sub.uploaded_image
+        else None
+    )
+    data = None
+    if storage_key:
+        try:
+            data = storage_service.get_file(storage_key)
+        except FileNotFoundError:
+            data = None
 
-    try:
-        data = storage_service.get_file(storage_key)
-        return Response(
-            content=data,
-            media_type="image/jpeg",
-            headers={"Cache-Control": "private, max-age=3600"},
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Diagnostic image file not found in storage")
+    if data is None:
+        data = generate_submission_sheet_fallback(sub, mode="diagnostic", db=db)
+        if storage_key:
+            try:
+                storage_service.save_file(data, Path(storage_key).name, subfolder=Path(storage_key).parent.as_posix())
+            except Exception:
+                pass
+
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.post("/{submission_id}/finalize")

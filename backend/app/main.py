@@ -21,6 +21,26 @@ logging.basicConfig(
 logger = logging.getLogger("digital_omr")
 
 
+def seed_storage_files():
+    """Populates local storage with pre-packaged historical assets if missing on ephemeral container disk."""
+    import shutil
+    from pathlib import Path
+    try:
+        seed_dir = Path(__file__).resolve().parent / "omr" / "assets" / "storage_seed"
+        target_dir = Path(settings.STORAGE_LOCAL_DIR).resolve()
+        if seed_dir.exists():
+            for f in seed_dir.rglob("*"):
+                if f.is_file():
+                    rel = f.relative_to(seed_dir)
+                    dest = target_dir / rel
+                    if not dest.exists():
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(f, dest)
+            logger.info("Storage seed sync completed successfully.")
+    except Exception as e:
+        logger.warning(f"Storage seed warning: {e}")
+
+
 def bootstrap_database():
     """Initializes tables and bootstraps initial admin user and template configurations."""
     try:
@@ -102,6 +122,7 @@ def bootstrap_database():
 async def lifespan(app: FastAPI):
     # Startup: Create tables and bootstrap
     logger.info("Starting Digital OMR Cloud backend...")
+    seed_storage_files()
     bootstrap_database()
     yield
     logger.info("Shutting down Digital OMR Cloud backend...")

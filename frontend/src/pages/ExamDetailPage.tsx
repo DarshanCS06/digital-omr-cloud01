@@ -1887,31 +1887,58 @@ export const ExamDetailPage: React.FC<ExamDetailPageProps> = ({
 
             {/* Images Preview Side-by-side (Original, Rectified, Corrected Overlay) */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="border rounded-xl p-2.5 bg-slate-50 text-center">
+              <div className="border rounded-xl p-2.5 bg-slate-50 text-center flex flex-col items-center">
                 <span className="text-xs font-bold text-slate-700 block mb-1.5">1. Original Uploaded Sheet</span>
-                <img
-                  src={`${api.getOriginalImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
-                  alt="Original"
-                  className="max-h-96 mx-auto rounded border border-slate-200 object-contain"
-                />
+                <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-slate-200 overflow-hidden">
+                  <img
+                    src={`${api.getOriginalImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
+                    alt="Original"
+                    loading="lazy"
+                    className="max-h-96 mx-auto object-contain transition-opacity duration-300"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('retry=1')) {
+                        target.src = `${api.getOriginalImageUrl(inspectedSub.id)}&retry=1`;
+                      }
+                    }}
+                  />
+                </div>
               </div>
-              <div className="border rounded-xl p-2.5 bg-slate-50 text-center">
+              <div className="border rounded-xl p-2.5 bg-slate-50 text-center flex flex-col items-center">
                 <span className="text-xs font-bold text-slate-700 block mb-1.5">2. Rectified Grid Alignment</span>
-                <img
-                  src={`${api.getRectifiedImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
-                  alt="Rectified"
-                  className="max-h-96 mx-auto rounded border border-slate-200 object-contain"
-                />
+                <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-slate-200 overflow-hidden">
+                  <img
+                    src={`${api.getRectifiedImageUrl(inspectedSub.id)}&t=${inspectedSub.id}`}
+                    alt="Rectified"
+                    loading="lazy"
+                    className="max-h-96 mx-auto object-contain transition-opacity duration-300"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('retry=1')) {
+                        target.src = `${api.getRectifiedImageUrl(inspectedSub.id)}&retry=1`;
+                      }
+                    }}
+                  />
+                </div>
               </div>
-              <div className="border-2 border-emerald-400 rounded-xl p-2.5 bg-emerald-50/40 text-center">
+              <div className="border-2 border-emerald-400 rounded-xl p-2.5 bg-emerald-50/40 text-center flex flex-col items-center">
                 <span className="text-xs font-extrabold text-emerald-900 block mb-1.5">
                   3. Corrected OMR Sheet (Green ✓ Right | Red ✗ Wrong | Blue = Key)
                 </span>
-                <img
-                  src={`${api.getDiagnosticImageUrl(inspectedSub.id)}&t=${Date.now()}`}
-                  alt="Corrected OMR Overlay"
-                  className="max-h-96 mx-auto rounded border border-emerald-300 object-contain"
-                />
+                <div className="w-full min-h-[220px] max-h-96 flex items-center justify-center bg-white rounded border border-emerald-300 overflow-hidden">
+                  <img
+                    src={`${api.getDiagnosticImageUrl(inspectedSub.id)}&t=${Date.now()}`}
+                    alt="Corrected OMR Overlay"
+                    loading="lazy"
+                    className="max-h-96 mx-auto object-contain transition-opacity duration-300"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.includes('retry=1')) {
+                        target.src = `${api.getDiagnosticImageUrl(inspectedSub.id)}&retry=1`;
+                      }
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
